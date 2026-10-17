@@ -106,6 +106,8 @@ progress{height:10px;border-radius:8px;accent-color:var(--c)}
 .edv canvas{max-width:100%;max-height:50vh;background:#fff;border-radius:6px;box-shadow:0 4px 18px rgba(0,0,0,.18);touch-action:none}
 .edc{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;margin-top:12px}.edc input[type=range]{padding:0;min-height:32px;border:0;box-shadow:none;accent-color:var(--c)}.edc output{font-weight:700;color:var(--c)}
 @media(max-width:700px){.edc,.opts{grid-template-columns:1fr}}
+.fi .big{flex:1 1 100%;min-height:52px;font-size:17px;box-shadow:0 4px 12px rgba(8,119,176,.28)}
+.steps span{font-size:13px;padding:10px 8px;justify-content:center}
 </style>
 </head>
 <body>
@@ -124,6 +126,7 @@ const $=s=>document.querySelector(s);
 const E=s=>String(s??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
 const SHOP_ID=new URLSearchParams(location.search).get('shop');
 const BASE=location.origin+location.pathname;
+const pubBase=()=>{const s=String((CURRENT_CFG||{}).site_url||'').trim().split('?')[0].split('#')[0];return/^https?:\/\//.test(s)?s:BASE};
 /* Cloud connection: paste your Supabase Project URL and publishable key here. */
 const SBC={url:'https://einznfibylssyjzyazok.supabase.co',key:'sb_publishable_2yIRQGN2DdHx_IEocU9btg_Dz9E8iSm'};
 const SB_URL=SBC.url||'',SB_KEY=SBC.key||'';
@@ -152,7 +155,7 @@ const FLOW={new:['review','rejected','cancelled'],review:['accepted','rejected',
 const rnd=n=>[...crypto.getRandomValues(new Uint8Array(n))].map(b=>b.toString(16).padStart(2,'0')).join('');
 const sha=async s=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))].map(b=>b.toString(16).padStart(2,'0')).join('');
 const uuid=()=>crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]&15;return(c==='x'?r:(r&3|8)).toString(16)});
-const DEF={shop_name:'My Print Shop',welcome:'Upload your documents and submit your printing requirements.',phone:'',whatsapp:'',address:'',hours:'',logo:'',cc:'92',max_mb:'20',extras:'Spiral binding\nLamination\nStapling'};
+const DEF={shop_name:'My Print Shop',welcome:'Upload your documents and submit your printing requirements.',phone:'',whatsapp:'',address:'',hours:'',logo:'',cc:'92',max_mb:'20',retention_days:'7',site_url:'',tagline:'',email:'',website:'',qr_services:'Business Cards\nFlyers & Brochures\nPosters & Banners\nDocument Printing\nCustom Printing',extras:'Spiral binding\nLamination\nStapling'};
 const CFG=()=>({...DEF,...(CURRENT_CFG||{})});
 const exList=c=>{let a;try{const j=JSON.parse(c.extras);if(Array.isArray(j))a=j.map(String);else if(j&&typeof j==='object')a=Object.keys(j)}catch{}
   if(!a)a=Array.isArray(c.extras)?c.extras.map(String):String(c.extras||'').split('\n');
@@ -161,7 +164,7 @@ const svc=c=>exList(c).map(x=>x.n);
 const RS=n=>'Rs '+Math.round(+n||0).toLocaleString('en-PK');
 const PRICE=(c,t)=>Math.max(+c['price_'+t]||0,0);
 const PMN={counter:'Counter',jazzcash:'JazzCash',easypaisa:'Easypaisa',bank:'Bank account'};
-const SETK=['price_bw','price_color','price_photo','price_other','jc_no','jc_title','ep_no','ep_title','bank_name','bank_title','bank_acc'];
+const SETK=['price_bw','price_color','price_photo','price_other','jc_no','jc_title','ep_no','ep_title','bank_name','bank_title','bank_acc','retention_days','site_url','tagline','email','website','qr_services'];
 const dg=s=>String(s??'').replace(/\D/g,'');
 const LOGO_PFX=SB_URL+'/storage/v1/object/public/logos/';
 const safeImg=s=>/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/=]+$/.test(s||'')||(SB_URL&&String(s||'').startsWith(LOGO_PFX)&&/^[A-Za-z0-9._~%:\/-]+$/.test(s))?s:'';
@@ -186,6 +189,10 @@ function brand(c,m){const l=safeImg(c.logo),t=String(c.phone||'').trim(),a=Strin
  return'<div class="brand"><div class="bin '+m+'"><div class="logo">'+(l?'<img src="'+l+'" alt="">':'<b>'+ini(c.shop_name)+'</b>')+'</div><div class="bi"><h1>'+E(c.shop_name)+'</h1>'+meta+hr+'</div><div class="acts">'+acts+'</div></div></div><div class="cmyk" aria-hidden="true"><i></i><i></i><i></i><i></i></div>'}
 const beep=()=>{try{const a=new AudioContext(),o=a.createOscillator();o.connect(a.destination);o.frequency.value=880;o.start();o.stop(a.currentTime+.25)}catch{}};
 addEventListener('offline',()=>alert('Connection Lost'));
+const notifOn=()=>{try{return localStorage.pd_notif!=='0'}catch{return true}};
+async function notify(t,b,tag){if(!notifOn()||!('Notification'in window)||Notification.permission!=='granted')return;
+  try{const r=await navigator.serviceWorker.getRegistration();if(r){await r.showNotification(t,{body:b,tag:tag||'pd-order',renotify:true,vibrate:[200,100,200]});return}}catch{}
+  try{const n=new Notification(t,{body:b,tag:tag||'pd-order'});n.onclick=()=>{focus();n.close()}}catch{}}
 
 /* ===== Document editor (customer side, optional) ===== */
 function editDoc(file,maxMb){return new Promise(resolve=>{
@@ -267,7 +274,7 @@ function resetScreen(){$('#app').innerHTML='<div class="card" style="max-width:5
 
 /* ================= CUSTOMER ================= */
 function customer(){
-  let cfg,files=[],busy=false,fn=0,payMode='',payMethod='',tid='';const sid=uuid();
+  let cfg,files=[],busy=false,fn=0,payMode='',payMethod='',tid='',step=1;const sid=uuid();
   const pgCount=f=>{const x=ext(f.file.name);f.pages=undefined;if(/^(jpg|jpeg|png)$/.test(x))f.pages=1;else if(x==='pdf'&&window.pdfjsLib)f.file.arrayBuffer().then(b=>pdfjsLib.getDocument({data:b}).promise).then(d=>{f.pages=d.numPages;est()}).catch(()=>{});est()};
   const calc=()=>{const t=($('#t')||{}).value||'bw',cp=Math.max(parseInt(($('#c')||{}).value)||1,1),pg=files.reduce((n,f)=>n+(f.pages||0),0),unk=files.some(f=>f.pages===undefined),rate=PRICE(cfg,t),
     exT=[...document.querySelectorAll('.ex:checked')].reduce((n,c)=>n+((exList(cfg).find(x=>x.n===c.value)||{}).p||0),0);
@@ -277,13 +284,13 @@ function customer(){
   const accts=()=>{const a=[];if(cfg.jc_no)a.push({k:'jazzcash',n:'JazzCash',rows:[['Number',cfg.jc_no],['Account title',cfg.jc_title]]});if(cfg.ep_no)a.push({k:'easypaisa',n:'Easypaisa',rows:[['Number',cfg.ep_no],['Account title',cfg.ep_title]]});
     if(cfg.bank_acc)a.push({k:'bank',n:'Bank account',rows:[['Bank',cfg.bank_name],['Account title',cfg.bank_title],['Account / IBAN',cfg.bank_acc]]});return a};
   const payUI=()=>{const k=calc(),ac=accts(),sel=ac.find(a=>a.k===payMethod);if(payMode==='online'&&!ac.length)payMode='';
-    $('#s2').innerHTML='<div class="card"><h2>Order summary</h2><p>'+E($('#n').value.trim())+' &middot; '+files.length+' file(s) &middot; '+k.pg*k.cp+' prints</p>'+(k.priced?'<div class="tot big">Total <b>'+E(RS(k.total))+'</b></div>'+(k.unk?'<p class="muted">Some files are counted by the shop, so the final amount may change.</p>':''):'<p class="muted">The shop will confirm the price.</p>')+'</div>'+
+    $('#s3').innerHTML='<div class="card"><h2>Order summary</h2><p>'+($('#n').value.trim()?E($('#n').value.trim())+' &middot; ':'')+files.length+' file(s) &middot; '+k.pg*k.cp+' prints</p>'+(k.priced?'<div class="tot big">Total <b>'+E(RS(k.total))+'</b></div>'+(k.unk?'<p class="muted">Some files are counted by the shop, so the final amount may change.</p>':''):'<p class="muted">The shop will confirm the price.</p>')+'</div>'+
     '<div class="card"><h2>How would you like to pay?</h2><div class="opts"><button type="button" class="opt'+(payMode==='online'?' on':'')+'" data-m="online"'+(ac.length?'':' disabled')+'><b>Pay online</b><span>'+(ac.length?'JazzCash, Easypaisa or bank transfer':'Not available at this shop')+'</span></button><button type="button" class="opt'+(payMode==='counter'?' on':'')+'" data-m="counter"><b>Pay at counter</b><span>Pay when you collect your prints</span></button></div>'+
     (payMode==='online'?'<div class="opts m">'+ac.map(a=>'<button type="button" class="opt'+(payMethod===a.k?' on':'')+'" data-k="'+a.k+'"><b>'+a.n+'</b></button>').join('')+'</div>'+(sel?'<div class="acct"><dl class="kv">'+sel.rows.filter(r=>r[1]).map(r=>'<dt>'+r[0]+'</dt><dd>'+E(r[1])+'</dd>').join('')+'</dl><p>'+(k.priced?'Send <b>'+E(RS(k.total))+'</b> to this account, then':'Send the payment, then')+' enter your transaction ID below.</p><label for="tid">Transaction ID (optional)</label><input id="tid" value="'+E(tid)+'" maxlength="60"></div>':'<p class="muted">Choose a payment method to see the account details.</p>'):payMode==='counter'?'<p class="muted">You will pay at the shop counter. Press Submit to send your request.</p>':'<p class="muted">Choose one option to continue.</p>')+'</div>';
-    document.querySelectorAll('#s2 [data-m]').forEach(b=>b.onclick=()=>{payMode=b.dataset.m;if(payMode==='counter')payMethod='';payUI()});
-    document.querySelectorAll('#s2 [data-k]').forEach(b=>b.onclick=()=>{payMethod=b.dataset.k;payUI()});
+    document.querySelectorAll('#s3 [data-m]').forEach(b=>b.onclick=()=>{payMode=b.dataset.m;if(payMode==='counter')payMethod='';payUI()});
+    document.querySelectorAll('#s3 [data-k]').forEach(b=>b.onclick=()=>{payMethod=b.dataset.k;payUI()});
     if($('#tid'))$('#tid').oninput=e=>{tid=e.target.value}};
-  const stepUI=n=>{$('#s1').hidden=n!==1;$('#s2').hidden=n!==2;$('#bk').hidden=n===1;$('#nx').hidden=n!==1;$('#go').hidden=n!==2;document.querySelectorAll('.steps span').forEach((b,i)=>b.classList.toggle('on',i<n));$('#er').textContent='';if(n===2)payUI();scrollTo({top:0,behavior:'smooth'})};
+  const stepUI=n=>{step=n;[1,2,3].forEach(i=>$('#s'+i).hidden=i!==n);$('#bk').hidden=n===1;$('#nx').hidden=n===3;$('#go').hidden=n!==3;document.querySelectorAll('.steps span').forEach((b,i)=>b.classList.toggle('on',i<n));$('#er').textContent='';if(n===3)payUI();if(n===2)est();scrollTo({top:0,behavior:'smooth'})};
   async function edit(i){const f=files[i],nf=await editDoc(f.file,+cfg.max_mb||20);if(!nf)return;URL.revokeObjectURL(f.url);f.url=null;f.pv=null;f.file=nf;f.n=++fn;f.path=null;f.state='edited';pgCount(f);list()}
   const app=$('#app'),show=h=>app.innerHTML=h,head=c=>$('#hdr').innerHTML=brand(c,'cust');
   if(!sb)return show('<div class="card"><h2>This link is not set up</h2><p class="muted">Supabase is not configured.</p></div>');
@@ -302,14 +309,14 @@ function customer(){
   function form(){
     document.title=cfg.shop_name+' - Print Request';
     const last=JSON.parse(localStorage['pd_last_'+SHOP_ID]||'null');
-    head(cfg);show('<p class="intro">'+E(cfg.welcome)+'</p>'+'<div class="steps"><span class="on"><i>1</i>Files &amp; options</span><span><i>2</i>Payment</span></div>'+
+    head(cfg);show('<p class="intro">'+E(cfg.welcome)+'</p>'+'<div class="steps"><span class="on"><i>1</i>Files</span><span><i>2</i>Options</span><span><i>3</i>Payment</span></div>'+
     (last?'<div class="card"><b>Your last request: '+E(last.number)+'</b><p id="st" class="muted"></p><button class="sec" id="chk">Check status</button></div>':'')+
-    '<div id="s1"><div class="card"><h2>Your details</h2><label for="n">Full name</label><input id="n" autocomplete="name"><label for="p">Mobile / WhatsApp</label><input id="p" type="tel" autocomplete="tel"><label for="e">Email (optional)</label><input id="e" type="email"></div>'+
-    '<div class="card"><h2>Files</h2><input id="f" class="sr" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"><label class="drop" id="dz" for="f">'+ic('up')+'<span class="dt">Select one or more files</span><span class="pickbtn">Browse files</span></label><div id="fl"></div><p class="muted">PDF, JPG, PNG, DOC, DOCX. Max '+E(cfg.max_mb)+' MB each, up to 10 files. Tap Edit on a file to rotate, crop or adjust it (optional). Files are deleted from cloud storage 7 days after your order is finished.</p></div>'+
-    '<div class="card"><h2>Printing</h2><div class="row"><div><label for="t">Type</label><select id="t"><option value="bw">Black &amp; White</option><option value="color">Color</option><option value="photo">Photo</option><option value="other">Other</option></select></div><div><label for="s">Paper size</label><select id="s"><option>A4</option><option>A5</option><option>A3</option><option>Letter</option><option>Legal</option><option>Custom</option></select></div></div>'+
+    '<div id="s1">'+
+    '<div class="card"><h2>Files</h2><input id="f" class="sr" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"><label class="drop" id="dz" for="f">'+ic('up')+'<span class="dt">Select one or more files</span><span class="pickbtn">Browse files</span></label><div id="fl"></div><p class="muted">PDF, JPG, PNG, DOC, DOCX. Max '+E(cfg.max_mb)+' MB each, up to 10 files. Tap Edit on a file to rotate, crop or adjust it (optional). Files are deleted from cloud storage '+E(Math.max(+cfg.retention_days||7,1))+' day(s) after you submit.</p></div>'+'<div class="card"><h2>Your details <span class="muted">(optional)</span></h2><label for="n">Full name (optional)</label><input id="n" autocomplete="name"><label for="p">Mobile / WhatsApp (optional)</label><input id="p" type="tel" autocomplete="tel"><label for="e">Email (optional)</label><input id="e" type="email"></div></div>'+
+    '<div id="s2" hidden><div class="card"><h2>Print options</h2><div class="row"><div><label for="t">Type</label><select id="t"><option value="bw">Black &amp; White</option><option value="color">Color</option><option value="photo">Photo</option><option value="other">Other</option></select></div><div><label for="s">Paper size</label><select id="s"><option>A4</option><option>A5</option><option>A3</option><option>Letter</option><option>Legal</option><option>Custom</option></select></div></div>'+
     '<div class="row"><div><label for="d">Sides</label><select id="d"><option value="single">Single-sided</option><option value="double">Double-sided</option></select></div><div><label for="o">Orientation</label><select id="o"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></div><div><label for="c">Copies</label><input id="c" type="number" min="1" value="1" inputmode="numeric"></div></div>'+
     (exList(cfg).length?'<label>Additional services</label>'+exList(cfg).map(x=>'<label class="chk"><input type="checkbox" class="ex" value="'+E(x.n)+'">'+E(x.n)+(x.p?' <span class="muted">(+'+E(RS(x.p))+')</span>':'')+'</label>').join(''):'')+
-    '<label for="i">Special instructions</label><textarea id="i" rows="3"></textarea></div><div class="est" id="est"></div></div><div id="s2" hidden></div><progress id="pg" value="0" max="1" hidden style="width:100%"></progress><div class="muted" id="pgt"></div><div class="err" id="er" role="alert"></div><div class="btns act"><button class="sec" id="bk" hidden>Back</button><button id="nx">Continue to payment</button><button id="go" hidden>Submit printing request</button></div>');
+    '<label for="i">Special instructions</label><textarea id="i" rows="3"></textarea></div><div class="est" id="est"></div></div><div id="s3" hidden></div><progress id="pg" value="0" max="1" hidden style="width:100%"></progress><div class="muted" id="pgt"></div><div class="err" id="er" role="alert"></div><div class="btns act"><button class="sec" id="bk" hidden>Back</button><button id="nx">Continue to payment</button><button id="go" hidden>Submit printing request</button></div>');
     if(last)$('#chk').onclick=async()=>{
       const {data,error}=await sb.rpc('get_order_status',{p_shop_id:SHOP_ID,p_token:last.token});
       const row=Array.isArray(data)?data[0]:data;
@@ -324,13 +331,13 @@ function customer(){
         if(files.length<10){const e2={file:f,state:'ready',n:++fn};files.push(e2);pgCount(e2)}else skip++}
       if(skip)er.textContent='Only 10 files are allowed. '+skip+' file(s) were not added.';e.target.value='';list()};
     $('#go').onclick=submit;
-    $('#s1').addEventListener('input',est);$('#s1').addEventListener('change',est);
+    $('#s2').addEventListener('input',est);$('#s2').addEventListener('change',est);
     $('#nx').onclick=()=>{const er=$('#er');er.textContent='';const name=$('#n').value.trim(),phone=$('#p').value.replace(/[^\d+]/g,'');
-      if(!name||phone.length<7)return er.textContent='Please enter your name and a valid mobile number.';if(!files.length)return er.textContent='Please add at least one file.';stepUI(2)};
-    $('#bk').onclick=()=>stepUI(1);
+      if(phone&&phone.length<7)return er.textContent='Please enter a valid mobile number or leave it empty.';if(step===1){if(!files.length)return er.textContent='Please add at least one file.';return stepUI(2)}if(!(parseInt($('#c').value)>=1))return er.textContent='Copies must be at least 1.';stepUI(3)};
+    $('#bk').onclick=()=>stepUI(step-1);
   }
   function list(){$('#fl').innerHTML=files.map((f,i)=>{const x=ext(f.file.name);if(!f.url)f.url=URL.createObjectURL(f.file);
-      return'<div class="fi"><b class="th ex">'+E(x.toUpperCase())+'</b><span>'+E(f.file.name)+'<br><small class="muted">'+(f.file.size/1024).toFixed(0)+' KB - '+E(f.state)+'</small></span>'+(!busy&&/^(pdf|jpg|jpeg|png)$/.test(x)?'<button class="sec sm" data-ed="'+i+'">Edit</button>':'')+'<button class="sec sm" data-pv="'+i+'">Enlarge</button>'+(busy?'':'<button class="bad sm" data-i="'+i+'">Remove</button>')+'<div class="pv" data-box="'+i+'"></div></div>'}).join('');
+      return'<div class="fi"><b class="th ex">'+E(x.toUpperCase())+'</b><span>'+E(f.file.name)+'<br><small class="muted">'+(f.file.size/1024).toFixed(0)+' KB - '+E(f.state)+'</small></span>'+'<button class="sec sm" data-pv="'+i+'">Enlarge</button>'+(busy?'':'<button class="bad sm" data-i="'+i+'">Remove</button>')+'<div class="pv" data-box="'+i+'"></div>'+(!busy&&/^(pdf|jpg|jpeg|png)$/.test(x)?'<button class="big" data-ed="'+i+'">Edit document (optional)</button>':'')+'</div>'}).join('');
     files.forEach((f,i)=>{const box=$('#fl [data-box="'+i+'"]'),x=ext(f.file.name);
       if(f.pv){box.appendChild(f.pv);return}
       f.pv=document.createElement('div');box.appendChild(f.pv);
@@ -349,7 +356,7 @@ function customer(){
   async function submit(){
     if(busy)return;const er=$('#er');er.textContent='';
     const name=$('#n').value.trim(),phone=$('#p').value.replace(/[^\d+]/g,'');
-    if(!name||phone.length<7)return er.textContent='Please enter your name and a valid mobile number.';
+    if(phone&&phone.length<7)return er.textContent='Please enter a valid mobile number or leave it empty.';
     if(!files.length)return er.textContent='Please add at least one file.';
     if(!payMode)return er.textContent='Please choose how you want to pay.';
     if(payMode==='online'&&!payMethod)return er.textContent='Please choose a payment method.';
@@ -363,7 +370,7 @@ function customer(){
             if(!error||/already exists|duplicate/i.test(error.message||'')){err=null;break}err=error;await new Promise(r=>setTimeout(r,800*(a+1)))}
           if(err)throw err;f.path=path}
         sent+=f.file.size;prog(sent,total,i+1);done.push({name:f.file.name.slice(0,120),size:f.file.size,path:f.path});f.state='sent';list()}
-      const {data,error}=await sb.rpc('submit_order',{p_shop_id:SHOP_ID,p_id:sid,p_customer:{name:name.slice(0,80),phone:phone.slice(0,16),email:$('#e').value.trim().slice(0,100)},
+      const {data,error}=await sb.rpc('submit_order',{p_shop_id:SHOP_ID,p_id:sid,p_customer:{name:(name||'Guest').slice(0,80),phone:phone.slice(0,16),email:$('#e').value.trim().slice(0,100)},
         p_opts:{type:$('#t').value,size:$('#s').value,sides:$('#d').value,orient:$('#o').value,copies:parseInt($('#c').value)||1,extras:[...document.querySelectorAll('.ex:checked')].map(c=>c.value)},
         p_instructions:$('#i').value.slice(0,2000),p_files:done,p_pay_method:payMode==='counter'?'counter':payMethod,p_pay_ref:tid.slice(0,60),p_pages:calc().pg});
       if(error)throw error;const row=Array.isArray(data)?data[0]:data,number=row.order_number,token=row.order_token,amt=+row.order_amount||0;
@@ -395,13 +402,13 @@ async function sync(full){
   else{added=primed?rows.filter(o=>!old.has(o.id)):[];const prev=new Map(CACHE.map(o=>[o.id,o]));CACHE=rows.map(n=>keepBlobs(n,prev.get(n.id)));lastSeen=data.reduce((m,r)=>r.updated>m?r.updated:m,'')}
   primed=true;online=true;live();return added}
 async function poll(full){if(polling)return;polling=true;try{const a=await sync(full);if(!a)return;
-  if(a.length){unread+=a.length;beep();if('Notification'in window&&Notification.permission==='granted')a.forEach(o=>new Notification('New Printing Request',{body:o.number+' - '+o.customer.name}))}
+  if(a.length){unread+=a.length;beep();if(document.hidden||!document.hasFocus())notify('New printing request'+(a.length>1?'s':''),a.length>1?a.length+' new requests':a[0].number+(a[0].customer.name!=='Unknown'?' - '+a[0].customer.name:''))}
   const g=JSON.stringify(CACHE.map(o=>[o.id,o.status,o.files.length,o.updated]));if(g!==sig){sig=g;refresh()}}finally{polling=false}}
 /* Privacy + tidy-up: delete files of finished orders after RETAIN_DAYS, and remove uploads that never became an order */
 async function housekeeping(){try{const st=sb.storage.from('uploads');
-  for(const o of CACHE.filter(o=>FIN.test(o.status)&&o.files.length&&Date.now()-o.updated>RETAIN_DAYS*DAY)){
+  const rd=Math.max(+CFG().retention_days||RETAIN_DAYS,1);for(const o of CACHE.filter(o=>o.files.length&&Date.now()-o.created>rd*DAY)){
     const {error}=await st.remove(o.files.map(f=>f.path));if(error)continue;
-    const {data}=await sb.rpc('clear_order_files',{p_order:o.id,p_msg:'Files auto-deleted after '+RETAIN_DAYS+' days'});applyRow(data)}
+    const {data}=await sb.rpc('clear_order_files',{p_order:o.id,p_msg:'Files auto-deleted after '+rd+' day(s)'});applyRow(data)}
   const {data:dirs}=await st.list(CURRENT_SHOP_ID,{limit:1000});
   for(const d of dirs||[]){const {data:ex,error:ee}=await sb.from('orders').select('id').eq('shop_id',CURRENT_SHOP_ID).eq('id',d.name).maybeSingle();if(ee||ex)continue;
     const {data:fs}=await st.list(CURRENT_SHOP_ID+'/'+d.name,{limit:100});
@@ -478,7 +485,7 @@ async function loginShop(){
 async function bootAdmin(){
   $('#app').innerHTML='<div class="card">Loading your shop...</div>';
   try{await loadCfg();CACHE=[];primed=false;sig='';lastSeen='';await sync(true);shell();go('orders');
-    if(!booted){booted=true;let kt;const kick=()=>{clearTimeout(kt);kt=setTimeout(()=>poll(),300)};
+    if(!booted){booted=true;if('serviceWorker'in navigator&&isSecureContext)navigator.serviceWorker.register('sw.js').catch(()=>{});let kt;const kick=()=>{clearTimeout(kt);kt=setTimeout(()=>poll(),300)};
       setInterval(()=>poll(++tick%10===0),30000);setInterval(housekeeping,36e5);setTimeout(housekeeping,4000);
       document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll()});
       try{sb.channel('orders-'+CURRENT_SHOP_ID).on('postgres_changes',{event:'*',schema:'public',table:'orders',filter:'shop_id=eq.'+CURRENT_SHOP_ID},kick).subscribe()}catch{}}}
@@ -536,7 +543,7 @@ async function detail(id){
   const kv=a=>'<dl class="kv">'+a.map(x=>'<dt>'+x[0]+'</dt><dd>'+x[1]+'</dd>').join('')+'</dl>',nx=FLOW[o.status];
   $('#v').innerHTML='<div id="detail" data-id="'+id+'"><div class="btns" style="justify-content:space-between;margin-top:14px"><button class="sec sm" id="bk">← Orders</button><span class="pill st-'+o.status+'">'+ST[o.status]+'</span></div><h2 style="font-size:24px;margin:12px 0 0">'+E(o.number)+'</h2><p class="muted" style="margin:2px 0 0">Received '+fmt(o.created)+'</p><div class="dg">'+
   '<section class="card full"><h3>Next step</h3>'+(nx.length?'<div class="btns">'+nx.map(s=>'<button class="'+(/^(rejected|cancelled)$/.test(s)?'bad':MAIN[o.status]===s?'':'sec')+'" data-st="'+s+'">'+ACT[s]+'</button>').join('')+'</div>':'<p class="muted">This order is '+ST[o.status].toLowerCase()+'. No further steps.</p>')+'</section>'+
-  '<section class="card"><h3>Customer</h3>'+kv([['Name',E(c.name)],['Mobile',E(c.phone)]].concat(c.email?[['Email',E(c.email)]]:[]))+'<div class="btns"><a class="btn sec sm" href="tel:'+E(c.phone)+'">'+ic('ph')+'Call</a>'+(w?'<a class="btn wa sm" target="_blank" rel="noopener" href="https://wa.me/'+w+'?text='+encodeURIComponent('Hello '+c.name+', your order '+o.number+' at '+CFG().shop_name+' is now: '+ST[o.status]+'.')+'">'+ic('wa')+'WhatsApp</a>':'')+'</div></section>'+
+  '<section class="card"><h3>Customer</h3>'+kv([['Name',E(c.name)],['Mobile',E(c.phone||'Not provided')]].concat(c.email?[['Email',E(c.email)]]:[]))+'<div class="btns">'+(c.phone?'<a class="btn sec sm" href="tel:'+E(c.phone)+'">'+ic('ph')+'Call</a>':'')+(w?'<a class="btn wa sm" target="_blank" rel="noopener" href="https://wa.me/'+w+'?text='+encodeURIComponent('Hello '+c.name+', your order '+o.number+' at '+CFG().shop_name+' is now: '+ST[o.status]+'.')+'">'+ic('wa')+'WhatsApp</a>':'')+'</div></section>'+
   '<section class="card"><h3>Print requirements</h3>'+kv([['Type',E(TY[p.type]||p.type)],['Paper size',E(p.size)],['Sides',p.sides==='double'?'Double-sided':'Single-sided'],['Orientation',p.orient==='landscape'?'Landscape':'Portrait'],['Copies',E(p.copies)],['Services',E(p.extras.join(', ')||'None')],['Instructions',E(o.instructions||'None')]])+'</section>'+
   paySection(o,kv)+'<section class="card full"><h3>Files ('+o.files.length+' of '+o.expected+' received)</h3>'+(o.files.length?'<p><button id="pall">'+ic('pr')+'Print all files</button></p>':'')+(o.files.map((f,i)=>'<div class="fi"><span>'+E(f.name)+' <small class="muted">'+(f.size/1024).toFixed(0)+' KB</small></span><button class="sm" data-pr="'+i+'">'+ic('pr')+'Print</button><button class="sec sm" data-pv="'+i+'">Preview</button><button class="sec sm" data-dl="'+i+'">Download</button></div>').join('')||'<p class="muted">No files.</p>')+(o.files.length?'<p><button class="bad sm" id="rm">Delete files from storage</button></p>':'')+'</section>'+
   '<section class="card full"><h3>Activity</h3><ul class="tl">'+o.log.map(l=>'<li><span class="muted">'+fmt(l.t)+'</span> '+E(l.m)+'</li>').join('')+'</ul></section></div></div>';
@@ -557,21 +564,95 @@ async function detail(id){
     try{const paths=o.files.map(f=>f.path);if(paths.length){const {error:re}=await sb.storage.from('uploads').remove(paths);if(re)throw re}
       const {data,error}=await sb.rpc('clear_order_files',{p_order:o.id});if(error)throw error;applyRow(data)}catch(e){alert('Could not delete files: '+(e.message||e))}detail(id);stats()};
 }
+/* ===== Printable QR poster (canvas, 2048x3072) ===== */
+const rr=(g,x,y,w,h,r)=>{g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath()};
+const loadImg=u=>new Promise(ok=>{if(!u)return ok(null);const i=new Image();i.crossOrigin='anonymous';i.onload=()=>ok(i);i.onerror=()=>ok(null);i.src=u});
+async function qrCard(c,url){
+  if(!window.QRCode)throw new Error('QR library could not load (check internet).');
+  const NV='#16327a',OR='#f7861e',BL='#1f78d1',GR='#1aa557',W=1024,H=1536,S=2,cv=document.createElement('canvas');cv.width=W*S;cv.height=H*S;const g=cv.getContext('2d');g.scale(S,S);
+  try{await document.fonts.load('800 80px "Bricolage Grotesque"')}catch{}
+  const D='"Bricolage Grotesque","Segoe UI",system-ui,sans-serif',F=(w,s)=>w+' '+s+'px '+D;
+  const fit=(t,w,s,max)=>{g.font=F(w,s);while(g.measureText(t).width>max&&s>14){s-=2;g.font=F(w,s)}return s};
+  const wrap=(t,max)=>{const o=[];let l='';for(const w of String(t).split(/\s+/).filter(Boolean)){const n=l?l+' '+w:w;if(l&&g.measureText(n).width>max){o.push(l);l=w}else l=n}if(l)o.push(l);return o};
+  g.fillStyle='#fff';g.fillRect(0,0,W,H);
+  const sws=()=>[[340,250,OR],[300,215,BL],[255,180,NV]].forEach(([a,b,k])=>{g.fillStyle=k;g.beginPath();g.moveTo(0,0);g.lineTo(a,0);g.quadraticCurveTo(a*.28,b*.25,0,b);g.fill()});
+  sws();g.save();g.translate(0,H);g.scale(1,-1);sws();g.restore();g.save();g.translate(W,H);g.scale(-1,-1);sws();g.restore();
+  /* logo */
+  const lg=await loadImg(safeImg(c.logo));
+  if(lg){const k=Math.min(420/lg.width,170/lg.height),w=lg.width*k,h=lg.height*k;g.drawImage(lg,(W-w)/2,70+(170-h)/2,w,h)}
+  else{g.fillStyle=NV;g.beginPath();g.arc(W/2,155,85,0,7);g.fill();g.fillStyle='#fff';g.font=F(800,100);g.textAlign='center';g.textBaseline='middle';g.fillText((String(c.shop_name||'?').trim().match(/[\p{L}\p{N}]/u)||['?'])[0].toUpperCase(),W/2,160)}
+  /* name: first word navy, rest orange */
+  const wd=String(c.shop_name||'Print Shop').toUpperCase().trim().split(/\s+/),first=wd[0],rest=wd.slice(1).join(' '),full=first+(rest?' '+rest:'');
+  g.textBaseline='alphabetic';g.textAlign='left';const fs=fit(full,800,110,880);g.font=F(800,fs);const x0=(W-g.measureText(full).width)/2;
+  g.fillStyle=NV;g.fillText(first,x0,365);g.fillStyle=OR;g.fillText(rest?' '+rest:'',x0+g.measureText(first).width,365);
+  g.textAlign='center';g.font=F(600,28);g.fillStyle=NV;if('letterSpacing'in g)g.letterSpacing='10px';g.fillText('PRINTING SOLUTIONS',W/2,408);const tw=g.measureText('PRINTING SOLUTIONS').width;if('letterSpacing'in g)g.letterSpacing='0px';
+  g.strokeStyle=NV;g.lineWidth=2;g.beginPath();g.moveTo(W/2-tw/2-90,398);g.lineTo(W/2-tw/2-20,398);g.moveTo(W/2+tw/2+20,398);g.lineTo(W/2+tw/2+90,398);g.stroke();
+  if(c.tagline){g.font='italic 400 34px '+D;g.fillStyle='#566377';g.fillText(String(c.tagline).slice(0,60),W/2,462)}
+  /* services row */
+  const sv=String(c.qr_services||'').split('\n').map(x=>x.trim()).filter(Boolean).slice(0,5),n=sv.length;
+  const tint=['#dbe7f8','#fde4cc','#d3f0df','#e2e0f6','#f9d9e5'],ink=[NV,OR,'#168a45','#5a4fb5','#c2255c'];
+  const sg=(i,x,y)=>{g.save();g.strokeStyle=ink[i];g.lineWidth=4;g.lineCap=g.lineJoin='round';
+    if(i===0){rr(g,x-16,y-22,32,44,5);g.stroke();g.beginPath();[-8,2,12].forEach(d=>{g.moveTo(x-8,y+d);g.lineTo(x+8,y+d)});g.stroke()}
+    else if(i===1){rr(g,x-20,y-22,40,44,5);g.stroke();g.beginPath();g.moveTo(x-7,y-22);g.lineTo(x-7,y+22);g.moveTo(x+7,y-22);g.lineTo(x+7,y+22);g.stroke()}
+    else if(i===2){rr(g,x-22,y-20,44,40,5);g.stroke();g.beginPath();g.moveTo(x-22,y+10);g.lineTo(x-6,y-4);g.lineTo(x+6,y+8);g.lineTo(x+12,y+2);g.lineTo(x+22,y+12);g.stroke();g.beginPath();g.arc(x-10,y-9,3,0,7);g.stroke()}
+    else if(i===3){rr(g,x-24,y-6,48,24,5);g.stroke();g.strokeRect(x-14,y-22,28,16);g.strokeRect(x-14,y+8,28,16)}
+    else{rr(g,x-20,y-6,40,26,3);g.stroke();rr(g,x-24,y-16,48,10,3);g.stroke();g.beginPath();g.moveTo(x,y-16);g.lineTo(x,y+20);g.stroke();[-8,8].forEach(d=>{g.beginPath();g.arc(x+d,y-23,6,0,7);g.stroke()})}
+    g.restore()};
+  sv.forEach((t,i)=>{const cw=944/n,cx=40+(i+.5)*cw;g.fillStyle=tint[i];g.beginPath();g.arc(cx,540,48,0,7);g.fill();sg(i,cx,540);
+    if(i){g.strokeStyle='#dbe2ea';g.lineWidth=2;g.beginPath();g.moveTo(40+i*cw,500);g.lineTo(40+i*cw,640);g.stroke()}
+    g.font=F(700,24);g.fillStyle=NV;g.textAlign='center';wrap(t.toUpperCase(),Math.min(cw-20,190)).slice(0,2).forEach((l,k)=>g.fillText(l,cx,618+k*28))});
+  /* QR panel */
+  const hd=document.createElement('div');new QRCode(hd,{text:url,width:600,height:600,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});const qc=hd.querySelector('canvas');
+  g.save();g.shadowColor='rgba(20,33,61,.25)';g.shadowBlur=30;g.shadowOffsetY=10;g.fillStyle='#fff';rr(g,300,680,424,452,36);g.fill();g.restore();
+  g.fillStyle='#fff';g.fillRect(342,700,340,340);g.imageSmoothingEnabled=false;g.drawImage(qc,362,720,300,300);g.imageSmoothingEnabled=true;
+  g.strokeStyle=OR;g.lineWidth=7;g.lineCap='round';g.lineJoin='round';
+  [[322,700,1,1],[702,700,-1,1],[322,1040,1,-1],[702,1040,-1,-1]].forEach(([x,y,a,b])=>{g.beginPath();g.moveTo(x,y+44*b);g.lineTo(x,y);g.lineTo(x+44*a,y);g.stroke()});
+  g.fillStyle=OR;rr(g,318,1056,388,58,29);g.fill();const ps=fit('SCAN TO SEND YOUR FILES',700,26,340);g.font=F(700,ps);g.fillStyle='#fff';g.textAlign='center';g.textBaseline='middle';g.fillText('SCAN TO SEND YOUR FILES',512,1086);
+  /* contacts */
+  const web=String(c.website||'').replace(/^https?:\/\//i,'').replace(/\/$/,'');
+  const L=[{t:'ph',v:c.phone,k:NV,b:1},{t:'wa',v:c.whatsapp,k:GR,b:1}].filter(x=>x.v),Rt=[{t:'em',v:c.email,k:NV},{t:'web',v:web,k:NV}].filter(x=>x.v),cols=[L,Rt].filter(a=>a.length);
+  const ig=(t,x,y)=>{g.save();g.translate(x,y);g.strokeStyle='#fff';g.lineWidth=3;g.lineCap=g.lineJoin='round';
+    if(t==='ph'){g.rotate(-.6);rr(g,-6,-13,12,26,4);g.stroke()}
+    else if(t==='wa'){g.beginPath();g.arc(0,0,12,0,7);g.stroke();g.beginPath();g.moveTo(-9,9);g.lineTo(-13,15);g.lineTo(-5,12);g.stroke()}
+    else if(t==='em'){rr(g,-13,-9,26,18,3);g.stroke();g.beginPath();g.moveTo(-12,-8);g.lineTo(0,2);g.lineTo(12,-8);g.stroke()}
+    else{g.beginPath();g.arc(0,0,13,0,7);g.stroke();g.beginPath();g.ellipse(0,0,6,13,0,0,7);g.moveTo(-13,0);g.lineTo(13,0);g.stroke()}
+    g.restore()};
+  cols.forEach((col,ci)=>{const bx=cols.length===1?312:ci?570:130,mx=cols.length===1?330:ci?380:300;
+    col.forEach((it,r)=>{const y=1190+r*66;g.fillStyle=it.k;g.beginPath();g.arc(bx+27,y,27,0,7);g.fill();ig(it.t,bx+27,y);
+      const sz=fit(String(it.v),it.b?700:500,it.b?40:32,mx);g.font=F(it.b?700:500,sz);g.fillStyle=NV;g.textAlign='left';g.textBaseline='middle';g.fillText(String(it.v),bx+72,y+2)})});
+  if(cols.length===2){g.strokeStyle='#9aa7bb';g.lineWidth=2;g.beginPath();g.moveTo(515,1150);g.lineTo(515,1275);g.stroke()}
+  /* footer */
+  g.fillStyle=NV;rr(g,90,1310,844,170,60);g.fill();
+  const hasA=!!String(c.address||'').trim();g.font=F(500,32);g.textAlign='left';g.textBaseline='middle';
+  const ln=[...(hasA?wrap(c.address,620):[]),...(c.hours?[String(c.hours)]:[])].slice(0,3);if(!ln.length)ln.push(c.shop_name||'');
+  if(hasA){g.fillStyle='#fff';g.beginPath();g.arc(190,1385,22,Math.PI,0);g.lineTo(190,1430);g.closePath();g.fill();g.fillStyle=NV;g.beginPath();g.arc(190,1385,8,0,7);g.fill()}
+  g.fillStyle='#fff';g.font=F(500,ln.length>2?28:32);ln.forEach((l,k)=>g.fillText(l,hasA?265:120,1395-(ln.length-1)*21+k*42));
+  return cv}
 function qr(){
-  const c=CFG(),url=BASE+'?shop='+encodeURIComponent(CURRENT_SHOP_ID),l=safeImg(c.logo);
-  $('#v').innerHTML='<div class="card center" id="qrcard">'+(l?'<img src="'+l+'" alt="" style="height:64px;max-width:200px;object-fit:contain">':'')+'<h1>'+E(c.shop_name)+'</h1><h2>Scan to send your printing</h2><div id="qrc" style="display:inline-block"></div><p><b>Scan • Upload • Submit</b></p>'+(c.address?'<p class="muted">'+E(c.address)+'</p>':'')+(c.phone?'<p class="muted">'+E(c.phone)+'</p>':'')+(c.hours?'<p class="muted">'+E(c.hours)+'</p>':'')+'</div><div class="card"><div class="btns"><button id="pr">Print QR card</button><button class="sec" id="cp">Copy customer link</button></div><p class="muted" style="overflow-wrap:anywhere">'+E(url)+'</p><p class="muted">Customers can send requests at any time, even when this page is closed. Orders appear here when you open it.</p></div>';
-  if(window.QRCode)new QRCode($('#qrc'),{text:url,width:240,height:240});else $('#qrc').textContent='QR library could not load (check internet).';
-  $('#pr').onclick=()=>print();$('#cp').onclick=async()=>{try{await navigator.clipboard.writeText(url);$('#cp').textContent='Copied'}catch{$('#cp').textContent='Copy failed'}};
+  const c=CFG(),url=pubBase()+'?shop='+encodeURIComponent(CURRENT_SHOP_ID),nm=slugify(c.shop_name)+'-qr';let cvs=null;
+  $('#v').innerHTML='<div class="card center"><h2>Your shop QR card</h2><p class="muted">Download it, print it and paste it at your shop. Customers scan it to send their files.</p><div id="qpv" class="muted">Preparing your QR card...</div><div class="btns" style="justify-content:center;margin-top:14px"><button id="qpng" disabled>Download PNG</button><button class="sec" id="qpdf" disabled>Download PDF (A4)</button><button class="sec" id="pr" disabled>Print</button></div></div>'+
+  '<div class="card"><div class="btns"><button class="sec" id="cp">Copy customer link</button></div><p class="muted" style="overflow-wrap:anywhere">'+E(url)+'</p>'+(/^https?:/.test(url)?'':'<p class="err">This link only works on this phone. Open the tool from its public web address, or fill in "Public site address" in Settings, then download the QR again.</p>')+'<p class="muted">Edit the logo, phone, email, website, address and services in Settings. Customers can send requests at any time, even when this page is closed.</p></div>';
+  (async()=>{try{cvs=await qrCard(c,url);cvs.style.cssText='width:100%;max-width:420px;border-radius:14px;box-shadow:var(--sh)';$('#qpv').replaceChildren(cvs);['qpng','qpdf','pr'].forEach(i=>$('#'+i).disabled=false)}catch(e){$('#qpv').textContent='Could not create the QR card: '+(e.message||e)}})();
+  $('#qpng').onclick=()=>cvs.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=nm+'.png';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),6e4)},'image/png');
+  $('#qpdf').onclick=()=>{const J=window.jspdf&&window.jspdf.jsPDF;if(!J)return alert('PDF export needs an internet connection. Download the PNG instead.');const d=new J({unit:'mm',format:'a4'});d.addImage(cvs.toDataURL('image/jpeg',.95),'JPEG',6,0,198,297);d.save(nm+'.pdf')};
+  $('#pr').onclick=()=>{const u=cvs.toDataURL('image/png'),fr=document.createElement('iframe');fr.style.cssText='position:fixed;left:-10000px;width:800px;height:1100px;border:0';fr.srcdoc='<!doctype html><style>@page{size:A4 portrait;margin:0}html,body{margin:0;height:100%}img{display:block;height:100vh;width:auto;max-width:100%;margin:0 auto;object-fit:contain}</style><img src="'+u+'">';fr.onload=()=>{setTimeout(()=>{fr.contentWindow.focus();fr.contentWindow.print();setTimeout(()=>fr.remove(),60000)},300)};document.body.appendChild(fr)};
+  $('#cp').onclick=async()=>{try{await navigator.clipboard.writeText(url);$('#cp').textContent='Copied'}catch{$('#cp').textContent='Copy failed'}};
 }
 const settingsExtra=(c,f)=>'<section class="card"><h2>Prices (Rs per page)</h2><p class="muted">Used to calculate the customer total in real time. Leave empty to hide prices.</p><div class="sg"><div>'+f('price_bw','Black &amp; White','number')+'</div><div>'+f('price_color','Color','number')+'</div><div>'+f('price_photo','Photo','number')+'</div><div>'+f('price_other','Other','number')+'</div></div></section>'+
  '<section class="card"><h2>Online payment accounts</h2><p class="muted">Shown to customers who choose to pay online. Leave empty to hide a method.</p><h3>JazzCash</h3><div class="sg"><div>'+f('jc_no','Number','tel')+'</div><div>'+f('jc_title','Account title')+'</div></div><h3>Easypaisa</h3><div class="sg"><div>'+f('ep_no','Number','tel')+'</div><div>'+f('ep_title','Account title')+'</div></div><h3>Bank account</h3><div class="sg"><div>'+f('bank_name','Bank name')+'</div><div>'+f('bank_title','Account title')+'</div></div>'+f('bank_acc','Account number / IBAN')+'</section>';
+const settingsMore=(c,f)=>'<section class="card"><h2>QR card details</h2><p class="muted">Shown on your printable QR poster. Leave a field empty to hide it.</p>'+f('tagline','Tagline (e.g. Your Ideas • Our Prints)')+f('email','Email','email')+f('website','Website')+'<label for="qr_services">Services row (up to 5, one per line)</label><textarea id="qr_services" rows="5">'+E(c.qr_services)+'</textarea></section>'+'<section class="card"><h2>Privacy and storage</h2><label for="retention_days">Auto-delete customer files after</label><select id="retention_days">'+[1,2,3,7,14].map(d=>'<option value="'+d+'"'+(+c.retention_days===d?' selected':'')+'>'+d+' day'+(d>1?'s':'')+'</option>').join('')+'</select><p class="muted">Files are removed from storage automatically, even if you already downloaded them. Runs while this dashboard is open.</p></section>'+
+ '<section class="card"><h2>Notifications</h2><label class="chk"><input type="checkbox" id="nt"'+(notifOn()&&'Notification'in window&&Notification.permission==='granted'?' checked':'')+'>Notify me of new requests when I am on another tab or app</label><p class="muted" id="nts"></p><button class="sec sm" id="ntt" type="button">Send test notification</button></section>'+
+ '<section class="card"><h2>Public site address</h2><p class="muted">The https:// address where customers open this page. Used for the QR code.</p>'+f('site_url','Site address','url')+'</section>';
 function settings(){
   const c=CFG();let logo=safeImg(c.logo);
   const f=(k,l,t)=>'<label for="'+k+'">'+l+'</label><input id="'+k+'"'+(t?' type="'+t+'"':'')+' value="'+E(c[k])+'">';
   $('#v').innerHTML='<section class="card"><h2>Shop profile</h2><p class="muted">Shown in the header of the customer page and on your QR card.</p><div class="btns" style="gap:14px"><div class="logo big" id="lp"></div><div class="btns"><button class="sec" id="lu">Upload logo</button><input id="lf" type="file" accept="image/*" hidden><button class="bad" id="lrm">Remove</button></div></div>'+f('shop_name','Shop name')+f('welcome','Welcome message')+'</section>'+
   '<section class="card"><h2>Contact and location</h2><p class="muted">Customers get Call and WhatsApp buttons from these details.</p><div class="sg"><div>'+f('phone','Phone number','tel')+'</div><div>'+f('whatsapp','WhatsApp number (with country code)','tel')+'</div></div>'+f('address','Address')+f('hours','Shop hours (e.g. Mon-Sat, 9am-8pm)')+'</section>'+
-  '<section class="card"><h2>Requests</h2><div class="sg"><div>'+f('max_mb','Max file size (MB)','number')+'</div><div>'+f('cc','Country code for customer numbers')+'</div></div><label for="extras">Additional services (one per line, price after | e.g. Spiral binding|150)</label><textarea id="extras" rows="4">'+E(exList(c).map(x=>x.n+(x.p?'|'+x.p:'')).join('\n'))+'</textarea></section>'+settingsExtra(c,f)+'<div class="err" id="er" role="alert"></div><button id="sv">Save settings</button>';
+  '<section class="card"><h2>Requests</h2><div class="sg"><div>'+f('max_mb','Max file size (MB)','number')+'</div><div>'+f('cc','Country code for customer numbers')+'</div></div><label for="extras">Additional services (one per line, price after | e.g. Spiral binding|150)</label><textarea id="extras" rows="4">'+E(exList(c).map(x=>x.n+(x.p?'|'+x.p:'')).join('\n'))+'</textarea></section>'+settingsExtra(c,f)+settingsMore(c,f)+'<div class="err" id="er" role="alert"></div><button id="sv">Save settings</button>';
   const paint=()=>{$('#lp').innerHTML=logo?'<img src="'+logo+'" alt="">':'<b>'+ini(c.shop_name)+'</b>';$('#lrm').hidden=!logo};paint();
+  const nts=$('#nts'),nst=()=>{nts.textContent=!('Notification'in window)?'This browser does not support notifications.':Notification.permission==='denied'?'Notifications are blocked. Allow them in your browser site settings.':'Keep this tab open in the background. Phones also need sw.js uploaded next to this page.'};nst();
+  $('#nt').onchange=async e=>{if(e.target.checked){let p='denied';try{p=await Notification.requestPermission()}catch{}if(p!=='granted'){e.target.checked=false;nst();return}try{localStorage.pd_notif='1'}catch{}}else{try{localStorage.pd_notif='0'}catch{}}};
+  $('#ntt').onclick=async()=>{if(!('Notification'in window)||Notification.permission!=='granted')return nts.textContent='Turn on the notification switch first.';await notify('PrintDesk','Test notification - it works!','pd-test')};
   $('#lu').onclick=()=>$('#lf').click();$('#lrm').onclick=()=>{logo='';paint()};
   $('#lf').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f)return;const u=URL.createObjectURL(f),im=new Image();
     im.onload=()=>{URL.revokeObjectURL(u);const iw=im.width||256,ih=im.height||256,k=Math.min(1,256/Math.max(iw,ih)),w=Math.round(iw*k),h=Math.round(ih*k),cv=document.createElement('canvas');cv.width=w;cv.height=h;const x=cv.getContext('2d');x.drawImage(im,0,0,w,h);let d=cv.toDataURL('image/png');if(d.length>150000){x.globalCompositeOperation='destination-over';x.fillStyle='#fff';x.fillRect(0,0,w,h);d=cv.toDataURL('image/jpeg',.82)}logo=d;paint();$('#er').textContent='Logo ready. Press Save settings to apply it.'};
