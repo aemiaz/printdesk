@@ -370,7 +370,7 @@ function customer(){
             if(!error||/already exists|duplicate/i.test(error.message||'')){err=null;break}err=error;await new Promise(r=>setTimeout(r,800*(a+1)))}
           if(err)throw err;f.path=path}
         sent+=f.file.size;prog(sent,total,i+1);done.push({name:f.file.name.slice(0,120),size:f.file.size,path:f.path});f.state='sent';list()}
-      const {data,error}=await sb.rpc('submit_order',{p_shop_id:SHOP_ID,p_id:sid,p_customer:{name:(name||'Guest').slice(0,80),phone:phone.slice(0,16),email:$('#e').value.trim().slice(0,100)},
+      const {data,error}=await sb.rpc('submit_order',{p_shop_id:SHOP_ID,p_id:sid,p_customer:{name:(name||'Guest').slice(0,80),phone:(phone||'0000000000').slice(0,16),email:$('#e').value.trim().slice(0,100)},
         p_opts:{type:$('#t').value,size:$('#s').value,sides:$('#d').value,orient:$('#o').value,copies:parseInt($('#c').value)||1,extras:[...document.querySelectorAll('.ex:checked')].map(c=>c.value)},
         p_instructions:$('#i').value.slice(0,2000),p_files:done,p_pay_method:payMode==='counter'?'counter':payMethod,p_pay_ref:tid.slice(0,60),p_pages:calc().pg});
       if(error)throw error;const row=Array.isArray(data)?data[0]:data,number=row.order_number,token=row.order_token,amt=+row.order_amount||0;
@@ -384,7 +384,7 @@ function customer(){
 let CACHE=[],primed=false,sig='',lastSeen='',tick=0,booted=false,polling=false;
 const RETAIN_DAYS=7,DAY=864e5,FIN=/^(completed|rejected|cancelled)$/;
 const norm=o=>{const c=o.customer&&typeof o.customer==='object'?o.customer:{},p=o.opts&&typeof o.opts==='object'?o.opts:{};
-  return{...o,number:String(o.number||''),status:ST[o.status]?o.status:'new',customer:{name:String(c.name||'Unknown'),phone:String(c.phone||''),email:String(c.email||'')},
+  return{...o,number:String(o.number||''),status:ST[o.status]?o.status:'new',customer:{name:String(c.name||'Unknown'),phone:/^0+$/.test(String(c.phone||''))?'':String(c.phone||''),email:String(c.email||'')},
   opts:{type:p.type||'bw',size:p.size||'A4',sides:p.sides||'single',orient:p.orient||'portrait',copies:+p.copies||1,extras:Array.isArray(p.extras)?p.extras.map(String):[]},
   instructions:String(o.instructions||''),pages:+o.pages||0,amount:+o.amount||0,paid:+o.paid||0,paid_at:o.paid_at?+new Date(o.paid_at):0,pay_method:String(o.pay_method||'counter'),pay_ref:String(o.pay_ref||''),expected:+o.expected||0,created:+new Date(o.created),updated:+new Date(o.updated),files:Array.isArray(o.files)?o.files:[],log:Array.isArray(o.log)?o.log:[]}};
 const allO=async()=>CACHE,getO=async id=>CACHE.find(o=>o.id===id);
