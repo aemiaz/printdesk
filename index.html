@@ -120,6 +120,18 @@ progress{height:10px;border-radius:8px;accent-color:var(--c)}
 .opt.on:after{content:"\2713";position:absolute;right:14px;top:14px;width:30px;height:30px;border-radius:50%;background:var(--g);color:#fff;display:grid;place-items:center;font-weight:700;animation:pdpop .35s}
 .pay-hint{margin:12px 0 0;font-weight:700;color:var(--c);animation:pdbob 1.2s infinite}
 .shake{animation:pdshake .45s}
+@keyframes pdrise{from{opacity:0;transform:translateY(30px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes pdtw{0%,100%{opacity:.15;transform:scale(.6) rotate(0)}50%{opacity:1;transform:scale(1.25) rotate(25deg)}}
+.thx{position:relative;max-width:520px;margin:18px auto;background:#fff;border-radius:26px;box-shadow:0 20px 50px rgba(20,33,61,.22);overflow:hidden;text-align:center;animation:pdrise .6s cubic-bezier(.2,.9,.3,1.2)}
+.thx-top{background:linear-gradient(135deg,#14213d,#1b3566 55%,#0877b0 130%);color:#fff;padding:26px 18px 50px}
+.thx-top .logo{margin:0 auto 10px}.thx-top h2{color:#fff;margin:0;font-size:24px;overflow-wrap:anywhere}
+.thx-body{padding:0 20px 26px;margin-top:-34px;position:relative}
+.thx .tick{width:68px;height:68px;border-radius:50%;margin:0 auto 6px;display:grid;place-items:center;background:linear-gradient(135deg,#1aa557,#168a45);color:#fff;font-size:36px;box-shadow:0 8px 20px rgba(22,138,69,.4);animation:pdpop .6s .2s both}
+.thx-h{font-size:42px;margin:8px 0 4px;background:linear-gradient(90deg,#0877b0,#c2255c,#f7861e);-webkit-background-clip:text;background-clip:text;color:transparent}
+.thx-sub{margin:0 0 4px;font-size:17px}
+.thx-no{margin:16px auto;padding:14px;border-radius:16px;background:#f4f7fb;border:2px dashed #b7c4d8}.thx-no span{display:block;font-size:13px;color:var(--mu)}.thx-no b{font:800 26px var(--d);color:var(--ink);overflow-wrap:anywhere}
+.thx-fine{font-weight:700;color:var(--ink);margin:14px 0}
+.sp{position:absolute;font-style:normal;z-index:2;pointer-events:none;animation:pdtw 1.9s infinite ease-in-out}
 </style>
 </head>
 <body>
@@ -206,6 +218,15 @@ async function notify(t,b,tag){if(!notifOn()||!('Notification'in window)||Notifi
   try{const r=await navigator.serviceWorker.getRegistration();if(r){await r.showNotification(t,{body:b,tag:tag||'pd-order',renotify:true,vibrate:[200,100,200]});return}}catch{}
   try{const n=new Notification(t,{body:b,tag:tag||'pd-order'});n.onclick=()=>{focus();n.close()}}catch{}}
 
+/* confetti + sparkle blast */
+function blast(){if(matchMedia('(prefers-reduced-motion:reduce)').matches)return;
+  const cv=document.createElement('canvas'),dpr=Math.min(devicePixelRatio||1,2),W=innerWidth,H=innerHeight;cv.style.cssText='position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60';cv.width=W*dpr;cv.height=H*dpr;document.body.appendChild(cv);
+  const g=cv.getContext('2d');g.scale(dpr,dpr);const COL=['#00aeef','#ec008c','#fff200','#f7861e','#3ddc84','#ffd700','#ffffff'],P=[];
+  const burst=(x,y,n)=>{for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,v=4+Math.random()*11;P.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-4,r:3+Math.random()*5,c:COL[i%COL.length],rot:Math.random()*6,vr:(Math.random()-.5)*.4,sh:Math.random()<.35?0:Math.random()<.5?1:2,life:1,d:.006+Math.random()*.01})}};
+  const star=r=>{g.beginPath();for(let i=0;i<8;i++){const a=i*Math.PI/4,d=i%2?r*.4:r;g.lineTo(Math.cos(a)*d,Math.sin(a)*d)}g.closePath();g.fill()};
+  burst(W/2,H*.35,110);setTimeout(()=>burst(W*.2,H*.45,60),250);setTimeout(()=>burst(W*.8,H*.45,60),450);
+  let t=0;const loop=()=>{g.clearRect(0,0,W,H);P.forEach(p=>{p.vy+=.22;p.vx*=.985;p.x+=p.vx;p.y+=p.vy;p.rot+=p.vr;p.life-=p.d;g.save();g.globalAlpha=Math.max(p.life,0);g.translate(p.x,p.y);g.rotate(p.rot);g.fillStyle=p.c;if(p.sh===0)star(p.r*1.8);else if(p.sh===1)g.fillRect(-p.r,-p.r/2,p.r*2,p.r);else{g.beginPath();g.arc(0,0,p.r/1.5,0,7);g.fill()}g.restore()});
+    if(P.some(p=>p.life>0&&p.y<H+40)&&++t<400)requestAnimationFrame(loop);else cv.remove()};loop()}
 /* ===== Document editor (customer side, optional) ===== */
 function editDoc(file,maxMb){return new Promise(resolve=>{
   const x=ext(file.name),isPdf=x==='pdf',dq=()=>[[0,0],[1,0],[1,1],[0,1]],m=document.createElement('div'),$$=s=>m.querySelector(s);
@@ -364,6 +385,11 @@ function customer(){
     m.innerHTML='<div class="mbox"><div class="mh"><b>'+E(f.file.name)+'</b>'+(x==='pdf'?'<a class="btn sec sm" target="_blank" rel="noopener" href="'+f.url+'">Open in new tab</a>':'')+'<button class="sec sm" id="mx">Close</button></div><div class="mb">'+body+'</div></div>';
     document.body.appendChild(m);const kd=e=>{if(e.key==='Escape')cl()},cl=()=>{m.remove();document.removeEventListener('keydown',kd)};
     m.querySelector('#mx').onclick=cl;m.onclick=e=>{if(e.target===m)cl()};document.addEventListener('keydown',kd);m.querySelector('#mx').focus()}
+  const thanks=(number,amt,mode,nm)=>{const l=safeImg(cfg.logo),sh=E(cfg.shop_name),w=waNum(cfg.whatsapp||''),ph=String(cfg.phone||'').trim(),
+    sp=[[8,10,20,'#ffc933'],[88,8,16,'#ec008c'],[18,34,14,'#00aeef'],[80,30,22,'#ffc933'],[5,62,16,'#f7861e'],[92,60,14,'#00aeef'],[14,88,18,'#ec008c'],[84,90,16,'#ffc933']].map((a,i)=>'<i class="sp" style="left:'+a[0]+'%;top:'+a[1]+'%;font-size:'+a[2]+'px;color:'+a[3]+';animation-delay:'+(i*.23)+'s">&#10022;</i>').join('');
+    $('#hdr').innerHTML='';
+    show('<div class="thx">'+sp+'<div class="thx-top"><div class="logo big">'+(l?'<img src="'+l+'" alt="">':'<b>'+ini(cfg.shop_name)+'</b>')+'</div><h2>'+sh+'</h2></div><div class="cmyk" aria-hidden="true"><i></i><i></i><i></i><i></i></div><div class="thx-body"><div class="tick">&#10003;</div><h1 class="thx-h">Thank you!</h1><p class="thx-sub">'+(nm?'Dear <b>'+E(nm)+'</b>, w':'W')+'e have received your printing request. '+sh+' will start working on it shortly.</p><div class="thx-no"><span>Your request number</span><b>'+E(number)+'</b></div>'+(amt?'<p class="tot big">Total <b>'+E(RS(amt))+'</b></p>':'')+'<p class="muted">'+(mode==='counter'?'Please pay at the counter when you collect your prints.':'The shop will check your payment using your transaction ID.')+' Keep this number to check your order status.</p>'+((ph||w)?'<div class="btns" style="justify-content:center;margin:12px 0">'+(ph?'<a class="btn sec" href="tel:'+E(ph.replace(/[^\d+]/g,''))+'">'+ic('ph')+'Call shop</a>':'')+(w?'<a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/'+w+'?text='+encodeURIComponent('Hello, my request number is '+number)+'">'+ic('wa')+'WhatsApp</a>':'')+'</div>':'')+'<p class="thx-fine">Thank you for choosing '+sh+' &#10084;</p><button onclick="location.reload()">Done</button></div></div>');
+    scrollTo({top:0});blast()};
   const payWarn=m=>{$('#er').textContent=m;const e=document.querySelector('#s3 .need')||$('#s3');e.classList.remove('shake');void e.offsetWidth;e.classList.add('shake');e.scrollIntoView({behavior:'smooth',block:'center'})};
   const prog=(d,t,i)=>{const p=$('#pg');if(!p)return;p.max=t||1;p.value=d;$('#pgt').textContent='Uploading file '+Math.min(i+1,files.length)+' of '+files.length+' ('+Math.round(d/(t||1)*100)+'%)'};
   async function submit(){
@@ -388,7 +414,7 @@ function customer(){
         p_instructions:$('#i').value.slice(0,2000),p_files:done,p_pay_method:payMode==='counter'?'counter':payMethod,p_pay_ref:tid.slice(0,60),p_pages:calc().pg});
       if(error)throw error;const row=Array.isArray(data)?data[0]:data,number=row.order_number,token=row.order_token,amt=+row.order_amount||0;
       localStorage['pd_last_'+SHOP_ID]=JSON.stringify({number,token});
-      show('<div class="card center ok"><div class="tick">&#10003;</div><h2>Request submitted</h2><p>Your request number</p><h1>'+E(number)+'</h1>'+(amt?'<p class="tot big">Total <b>'+E(RS(amt))+'</b></p>':'')+'<p class="muted">'+(payMode==='counter'?'Please pay at the counter when you collect your prints.':'The shop will check your payment using your transaction ID.')+' Keep this number to check your order status.</p><button onclick="location.reload()">Done</button></div>');
+      thanks(number,amt,payMode,name);
     }catch(e){busy=false;$('#pg').hidden=true;$('#go').disabled=false;$('#go').textContent='Submit printing request';files.forEach(f=>{if(f.state!=='sent')f.state='ready'});er.textContent='Could not submit: '+(e.message||'connection problem')+'. Please try again.';list()}
   }
 }
